@@ -11,88 +11,111 @@ type Word = {
   drift: number;
   opacity: number;
   size: number;
-  glow: number;
-  color: string;
+  neon: boolean;
 };
 
+/** Floating words for onboarding — low FPS, no shadowBlur, pauses off-tab. */
 export default function WordSnow() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
     const reduceMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
+    if (reduceMotion) return;
 
-    const isSmall = width < 640;
-    const wordCount = isSmall ? 14 : 24;
-
-    const words: Word[] = Array.from({ length: wordCount }, () => {
-      const neon = Math.random() < 0.18;
-      return {
-        text: snowWords[Math.floor(Math.random() * snowWords.length)],
-        x: Math.random() * width,
-        y: Math.random() * height,
-        speed: Math.random() * 0.4 + 0.14,
-        drift: Math.random() * 0.24 - 0.12,
-        opacity: Math.random() * 0.18 + 0.05,
-        size: Math.random() * (isSmall ? 6 : 9) + 11,
-        glow: neon ? 12 : 0,
-        color: neon ? "rgba(57,255,143," : "rgba(255,255,255,",
-      };
-    });
-
+    const isSmall = window.innerWidth < 640;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+    let width = 0;
+    let height = 0;
+    let visible = !document.hidden;
     let raf = 0;
-    function draw() {
-      if (!ctx) return;
-      ctx.clearRect(0, 0, width, height);
+    let last = 0;
+    const frameMs = 1000 / 24;
 
-      for (const w of words) {
-        const baseColor = `${w.color}${w.opacity})`;
-        ctx.save();
-        ctx.font = `${w.size}px var(--font-vazirmatn), sans-serif`;
-        ctx.textAlign = "center";
-        ctx.fillStyle = baseColor;
-        ctx.shadowBlur = w.glow;
-        ctx.shadowColor = w.glow
-          ? "rgba(57,255,143,0.9)"
-          : "rgba(255,255,255,0.3)";
-        ctx.fillText(w.text, w.x, w.y);
-        ctx.restore();
+    const wordCount = isSmall ? 8 : 14;
+    const words: Word[] = Array.from({ length: wordCount }, () => ({
+      text: snowWords[Math.floor(Math.random() * snowWords.length)],
+      x: Math.random(),
+      y: Math.random(),
+      speed: Math.random() * 0.32 + 0.1,
+      drift: Math.random() * 0.18 - 0.09,
+      opacity: Math.random() * 0.14 + 0.05,
+      size: Math.random() * (isSmall ? 5 : 7) + 11,
+      neon: Math.random() < 0.16,
+    }));
 
-        if (!reduceMotion) {
-          w.y += w.speed;
-          w.x += Math.sin(w.y * 0.02) * 0.08 + w.drift;
-        }
+    function resize() {
+      if (!canvas || !ctx) return;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
 
-        if (w.y > height + 30) {
-          w.y = -30;
-          w.x = Math.random() * width;
-          w.text = snowWords[Math.floor(Math.random() * snowWords.length)];
-        }
-
-        if (w.x > width) w.x = 0;
-        if (w.x < 0) w.x = width;
+    function draw(now: number) {
+      if (!ctx || !visible) {
+        raf = 0;
+        return;
       }
 
       raf = requestAnimationFrame(draw);
-    }
-    draw();
+      if (now - last < frameMs) return;
+      last = now;
 
-    function onResize() {
-      if (!canvas) return;
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
+      ctx.clearRect(0, 0, width, height);
+      ctx.textAlign = "center";
+
+      for (const w of words) {
+        ctx.font = `${w.size}px var(--font-vazirmatn), sans-serif`;
+        ctx.fillStyle = w.neon
+          ? `rgba(57,255,143,${w.opacity})`
+          : `rgba(255,255,255,${w.opacity})`;
+        ctx.fillText(w.text, w.x * width, w.y * height);
+
+        w.y += w.speed / height;
+        w.x += w.drift / width;
+        if (w.y > 1.05) {
+          w.y = -0.05;
+          w.x = Math.random();
+          w.text = snowWords[Math.floor(Math.random() * snowWords.length)];
+        }
+        if (w.x > 1) w.x = 0;
+        if (w.x < 0) w.x = 1;
+      }
     }
+
+    function onVisibility() {
+      visible = !document.hidden;
+      if (visible && !raf) {
+        last = 0;
+        raf = requestAnimationFrame(draw);
+      }
+    }
+
+    let resizeTimer = 0;
+    function onResize() {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(resize, 120);
+    }
+
+    resize();
+    raf = requestAnimationFrame(draw);
+    document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("resize", onResize);
+
     return () => {
       cancelAnimationFrame(raf);
+      window.clearTimeout(resizeTimer);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", onResize);
     };
   }, []);
@@ -100,7 +123,7 @@ export default function WordSnow() {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-0 h-full w-full opacity-90"
+      className="pointer-events-none fixed inset-0 z-0 h-full w-full opacity-80"
       aria-hidden="true"
     />
   );

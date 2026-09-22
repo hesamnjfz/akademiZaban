@@ -65,7 +65,7 @@ export default function RootLayout({
         className={`${vazirmatn.variable} ${rubikMono.variable} font-fa bg-[var(--bg-deep)] text-white antialiased`}
       >
         <SiteAtmosphere />
-        <NeonSnow density={14} />
+        <NeonSnow density={8} />
         <div className="relative z-10">
           <LangProvider>{children}</LangProvider>
         </div>

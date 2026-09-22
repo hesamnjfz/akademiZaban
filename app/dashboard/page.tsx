@@ -12,40 +12,17 @@ import { courses, teachers, ongoingCourses } from "@/lib/data";
 export default function Dashboard() {
   const { lang } = useLang();
   const t = useT();
-  const [loadingProgress, setLoadingProgress] = useState(0);
   const [showLoadingBar, setShowLoadingBar] = useState(true);
 
   const dashboardHighlights = useMemo(
     () => [t("highlightDaily"), t("highlightPath"), t("highlightPractice")],
-    [t],
+    [lang],
   );
 
   useEffect(() => {
-    if (!showLoadingBar) {
-      return;
-    }
-
-    let rafId = 0;
-    const duration = 2400;
-    const startTime = performance.now();
-
-    const tick = (currentTime: number) => {
-      const rawProgress = ((currentTime - startTime) / duration) * 100;
-      const next = Math.min(Math.round(rawProgress), 100);
-
-      setLoadingProgress(next);
-
-      if (next >= 100) {
-        window.setTimeout(() => setShowLoadingBar(false), 200);
-        return;
-      }
-
-      rafId = window.requestAnimationFrame(tick);
-    };
-
-    rafId = window.requestAnimationFrame(tick);
-
-    return () => window.cancelAnimationFrame(rafId);
+    if (!showLoadingBar) return;
+    const timer = window.setTimeout(() => setShowLoadingBar(false), 1600);
+    return () => window.clearTimeout(timer);
   }, [showLoadingBar]);
 
   const quickStats = useMemo(
@@ -62,7 +39,7 @@ export default function Dashboard() {
         label: t("wordsLearned"),
       },
     ],
-    [lang, t],
+    [lang],
   );
 
   return (
@@ -97,16 +74,10 @@ export default function Dashboard() {
               <div className="mt-5 max-w-md">
                 <div className="mb-2 flex items-center justify-between text-[11px] text-silver">
                   <span>{t("loadingCourses")}</span>
-                  <span className="text-neon">
-                    {formatStatValue(lang, loadingProgress)}%
-                  </span>
                 </div>
 
                 <div className="dashboard-progress-track h-2 overflow-hidden rounded-full bg-white/5">
-                  <div
-                    className="dashboard-progress-bar h-full rounded-full"
-                    style={{ width: `${loadingProgress}%` }}
-                  />
+                  <div className="dashboard-progress-bar dashboard-progress-bar-run h-full rounded-full" />
                 </div>
               </div>
             ) : null}

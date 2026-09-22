@@ -12,7 +12,7 @@ export default function CourseCard({ course }: { course: Course }) {
   return (
     <Link
       href={`/courses/${course.id}`}
-      className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] transition-all hover:-translate-y-1 hover:border-white/20"
+      className="group relative content-soft overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-white/20"
     >
       <div className="relative h-32 w-full overflow-hidden sm:h-36">
         <Image

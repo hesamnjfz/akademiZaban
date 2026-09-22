@@ -12,73 +12,109 @@ type Flake = {
   neon: boolean;
 };
 
-export default function NeonSnow({ density = 26 }: { density?: number }) {
+/** Lightweight particle snow — pauses off-tab, capped FPS, no blur shadows. */
+export default function NeonSnow({ density = 10 }: { density?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (reduceMotion) return;
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // fewer flakes on small screens, and respect user's motion preference
-    const isSmall = width < 640;
-    const count = reduceMotion ? 0 : Math.round(density * (isSmall ? 0.5 : 1));
+    const isSmall = window.innerWidth < 640;
+    const dpr = Math.min(window.devicePixelRatio || 1, isSmall ? 1 : 1.5);
+    let width = 0;
+    let height = 0;
+    let visible = !document.hidden;
+    let raf = 0;
+    let last = 0;
+    const frameMs = 1000 / 28;
 
+    const count = Math.round(density * (isSmall ? 0.45 : 0.75));
     const flakes: Flake[] = Array.from({ length: count }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      r: Math.random() * 1.6 + 0.5,
-      speed: Math.random() * 0.35 + 0.1,
-      drift: Math.random() * 0.3 - 0.15,
-      opacity: Math.random() * 0.35 + 0.12,
-      // only ~1 in 5 flakes is neon green, the rest are soft white — keeps the accent rare
-      neon: Math.random() < 0.2,
+      x: Math.random(),
+      y: Math.random(),
+      r: Math.random() * 1.4 + 0.4,
+      speed: Math.random() * 0.28 + 0.08,
+      drift: Math.random() * 0.22 - 0.11,
+      opacity: Math.random() * 0.28 + 0.1,
+      neon: Math.random() < 0.18,
     }));
 
-    let raf = 0;
+    function resize() {
+      if (!canvas || !ctx) return;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
 
-    function draw() {
-      if (!ctx) return;
+    function draw(now: number) {
+      if (!ctx || !visible) {
+        raf = 0;
+        return;
+      }
+
+      raf = requestAnimationFrame(draw);
+      if (now - last < frameMs) return;
+      last = now;
+
       ctx.clearRect(0, 0, width, height);
+
       for (const f of flakes) {
+        const x = f.x * width;
+        const y = f.y * height;
         ctx.beginPath();
-        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
-        if (f.neon) {
-          ctx.fillStyle = `rgba(57,255,143,${f.opacity})`;
-          ctx.shadowColor = "rgba(57,255,143,0.7)";
-          ctx.shadowBlur = 4;
-        } else {
-          ctx.fillStyle = `rgba(255,255,255,${f.opacity * 0.8})`;
-          ctx.shadowBlur = 0;
-        }
+        ctx.arc(x, y, f.r, 0, Math.PI * 2);
+        ctx.fillStyle = f.neon
+          ? `rgba(57,255,143,${f.opacity})`
+          : `rgba(255,255,255,${f.opacity * 0.75})`;
         ctx.fill();
 
-        f.y += f.speed;
-        f.x += f.drift;
-        if (f.y > height) {
-          f.y = -5;
-          f.x = Math.random() * width;
+        f.y += f.speed / height;
+        f.x += f.drift / width;
+        if (f.y > 1.02) {
+          f.y = -0.02;
+          f.x = Math.random();
         }
-        if (f.x > width) f.x = 0;
-        if (f.x < 0) f.x = width;
+        if (f.x > 1) f.x = 0;
+        if (f.x < 0) f.x = 1;
       }
-      raf = requestAnimationFrame(draw);
     }
-    draw();
 
-    function onResize() {
-      if (!canvas) return;
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
+    function onVisibility() {
+      visible = !document.hidden;
+      if (visible && !raf) {
+        last = 0;
+        raf = requestAnimationFrame(draw);
+      }
     }
+
+    let resizeTimer = 0;
+    function onResize() {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(resize, 120);
+    }
+
+    resize();
+    raf = requestAnimationFrame(draw);
+    document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("resize", onResize);
+
     return () => {
       cancelAnimationFrame(raf);
+      window.clearTimeout(resizeTimer);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", onResize);
     };
   }, [density]);
