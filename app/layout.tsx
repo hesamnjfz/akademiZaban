@@ -18,10 +18,23 @@ const rubikMono = Rubik_Mono_One({
   display: "swap",
 });
 
+function getSiteUrl() {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (raw) {
+    try {
+      return new URL(raw).toString();
+    } catch {
+      // fall through to default
+    }
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "https://akademizaban.vercel.app";
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://lang-academy.vercel.app",
-  ),
+  metadataBase: new URL(getSiteUrl()),
   title: {
     default: "VANOS | Language Academy",
     template: "%s | VANOS",

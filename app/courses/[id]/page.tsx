@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   Area,
   AreaChart,
@@ -22,14 +23,12 @@ import Navbar from "@/components/Navbar";
 import { courseRegistrationData, courses } from "@/lib/data";
 import { useLang, useT } from "@/lib/i18n";
 
-export default function CourseDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function CourseDetailPage() {
+  const params = useParams<{ id: string }>();
+  const courseId = typeof params?.id === "string" ? params.id : "";
   const { lang } = useLang();
   const t = useT();
-  const course = courses.find((item) => item.id === params.id);
+  const course = courses.find((item) => item.id === courseId);
 
   if (!course) {
     return (
